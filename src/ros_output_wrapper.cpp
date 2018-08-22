@@ -87,3 +87,18 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
     // update pose
     last_pose_ = pose;
 }
+
+//TODO under construction [
+void dso::IOWrap::SampleOutputWrapper::addImgToSeq(cv_bridge::CvImagePtr cv_ptr, int id) {
+//void dso::IOWrap::SampleOutputWrapper::addImgToSeq(cv::Mat img, int id) {
+    if (id % 10 == 0 && id > 10) {
+//        cv::imshow("Image Window Test [iowrapper]", cv_ptr->image);
+//        cv::imshow("Image Window Test [iowrapper]", img);
+        cv::imshow("Image Window Test [iowrapper]", seq_imgs_.find(id-10)->second);
+        cv::waitKey(1);
+    } else {
+        seq_imgs_.insert(std::pair<int, cv::Mat>(id, cv_ptr->image));
+//        seq_imgs_.push_back(img);
+    }
+}
+//TODO ]

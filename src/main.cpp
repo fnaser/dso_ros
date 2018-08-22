@@ -153,6 +153,19 @@ void vidCb(const sensor_msgs::ImageConstPtr img)
         setting_fullResetRequested=false;
     }
 
+    // TODO under construction [
+    if (frameID % 10 == 0) {
+        cv::imshow("Image Window Test [main]", cv_ptr->image);
+        cv::waitKey(1);
+    }
+
+//    for(IOWrap::Output3DWrapper* ow : fullSystem->outputWrapper.at(1))
+//    {
+//        dynamic_cast<IOWrap::SampleOutputWrapper*>(ow)->addImgToSeq(cv_ptr->image, frameID);
+//    }
+    dynamic_cast<IOWrap::SampleOutputWrapper*>(fullSystem->outputWrapper.at(1))->addImgToSeq(cv_ptr, frameID);
+    // TODO ]
+
     MinimalImageB minImg((int)cv_ptr->image.cols, (int)cv_ptr->image.rows,(unsigned char*)cv_ptr->image.data);
     ImageAndExposure* undistImg = undistorter->undistort<unsigned char>(&minImg, 1,0, 1.0f);
     fullSystem->addActiveFrame(undistImg, frameID);
@@ -199,6 +212,8 @@ int main( int argc, char** argv )
 
     if(useSampleOutput)
         fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper(nh));
+
+    ROS_INFO("number of iowrappers [%zu]", fullSystem->outputWrapper.size());
 
     if(undistorter->photometricUndist != 0)
         fullSystem->setGammaFunction(undistorter->photometricUndist->getG());

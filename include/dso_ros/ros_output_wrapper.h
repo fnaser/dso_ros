@@ -40,6 +40,10 @@
 #include <tf/transform_datatypes.h>
 #include <tf/transform_listener.h>
 
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/imgproc/imgproc.hpp>
+#include <opencv2/highgui/highgui.hpp>
+
 namespace dso
 {
 
@@ -59,7 +63,7 @@ namespace dso
             {
                 printf("OUT: Created SampleOutputWrapper\n");
 
-                dso_odom_pub_ = n.advertise<nav_msgs::Odometry>("odom", 5, false);
+                dso_odom_pub_ = n.advertise<nav_msgs::Odometry>("odom", 5, false); //TODO param
             }
 
             virtual ~SampleOutputWrapper()
@@ -109,15 +113,9 @@ namespace dso
 
             virtual void publishCamPose(FrameShell* frame, CalibHessian* HCalib) override;
 
-            virtual void pushLiveFrame(FrameHessian* image) override
-            {
-                // can be used to get the raw image / intensity pyramid.
-            }
+            virtual void pushLiveFrame(FrameHessian* image) override {}
 
-            virtual void pushDepthImage(MinimalImageB3* image) override
-            {
-                // can be used to get the raw image with depth overlay.
-            }
+            virtual void pushDepthImage(MinimalImageB3* image) override {}
 
             virtual bool needPushDepthImage() override
             {
@@ -148,6 +146,9 @@ namespace dso
                 }
             }
 
+            void addImgToSeq(cv_bridge::CvImagePtr, int id);
+            void addImgToSeq(cv::Mat img, int id);
+
         private:
 
             geometry_msgs::Pose last_pose_;
@@ -156,6 +157,9 @@ namespace dso
 
             ros::Publisher dso_odom_pub_;
             tf::TransformBroadcaster odom_broadcaster_;
+
+            std::map<int,cv::Mat> seq_imgs_;
+//            std::vector<cv::Mat> seq_imgs_;
         };
     }
 }
