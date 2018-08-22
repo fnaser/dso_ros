@@ -36,6 +36,9 @@ everything as described in the DSO project - only this is for real-time camera i
 			vignette=XXXXX/vignette.png \
 
 
+rosrun dso_ros dso_live image:=/usb_cam/image_raw calib=/home/fnaser/Pictures/dataset/sequence_28/camera_ros.txt gamma=/home/fnaser/Pictures/dataset/sequence_28/pcalib.txt vignette=/home/fnaser/Pictures/dataset/sequence_28/vignette.png preset=0
+
+
 ## 3.1 Accessing Data.
 see the DSO Readme. As of now, there is no default ROS-based `Output3DWrapper` - you will have to write your own.
 
