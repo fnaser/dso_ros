@@ -1,0 +1,15 @@
+./dso_dataset \
+		files=/home/fnaser/Pictures/dataset/sequence_33/images.zip \
+		calib=/home/fnaser/Pictures/dataset/sequence_33/camera.txt \
+		gamma=/home/fnaser/Pictures/dataset/sequence_33/pcalib.txt \
+		vignette=/home/fnaser/Pictures/dataset/sequence_33/vignette.png \
+		preset=0 \
+		mode=0
+
+./dso_dataset \
+		files=/home/fnaser/Pictures/dataset/sequence_28/images.zip \
+		calib=/home/fnaser/Pictures/dataset/sequence_28/camera.txt \
+		gamma=/home/fnaser/Pictures/dataset/sequence_28/pcalib.txt \
+		vignette=/home/fnaser/Pictures/dataset/sequence_28/vignette.png \
+		preset=0 \
+		mode=0

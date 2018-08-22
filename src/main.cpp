@@ -147,8 +147,9 @@ void vidCb(const sensor_msgs::ImageConstPtr img)
         fullSystem = new FullSystem();
         fullSystem->linearizeOperation=false;
         fullSystem->outputWrapper = wraps;
-        if(undistorter->photometricUndist != 0)
+        if(undistorter->photometricUndist != 0) {
             fullSystem->setGammaFunction(undistorter->photometricUndist->getG());
+        }
         setting_fullResetRequested=false;
     }
 
@@ -163,6 +164,7 @@ void vidCb(const sensor_msgs::ImageConstPtr img)
 int main( int argc, char** argv )
 {
     ros::init(argc, argv, "dso_live");
+    ros::NodeHandle nh;
 
     for(int i=1; i<argc; i++) parseArgument(argv[i]);
 
@@ -196,14 +198,12 @@ int main( int argc, char** argv )
                 (int)undistorter->getSize()[1]));
 
     if(useSampleOutput)
-        fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper());
+        fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper(nh));
 
     if(undistorter->photometricUndist != 0)
         fullSystem->setGammaFunction(undistorter->photometricUndist->getG());
 
-    ros::NodeHandle nh;
     ros::Subscriber imgSub = nh.subscribe("image", 1, &vidCb);
-
     ros::spin();
 
     // Clean up
