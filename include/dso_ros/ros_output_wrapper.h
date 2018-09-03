@@ -44,6 +44,14 @@
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
+#include <float.h>
+#include <math.h>
+
+#include <Eigen/QR>
+#include <Eigen/Dense>
+//#include <boost/accumulators/accumulators.hpp>
+//#include <boost/accumulators/statistics.hpp>
+
 namespace dso
 {
 
@@ -64,6 +72,8 @@ namespace dso
                 printf("OUT: Created SampleOutputWrapper\n");
 
                 dso_odom_pub_ = n.advertise<nav_msgs::Odometry>("odom", 5, false); //TODO param
+
+                init_wpts_ = false;
             }
 
             virtual ~SampleOutputWrapper()
@@ -115,7 +125,7 @@ namespace dso
 
             virtual void pushLiveFrame(FrameHessian* image) override {}
 
-            virtual void pushDepthImage(MinimalImageB3* image) override {}
+            virtual void pushDepthImage(MinimalImageB3* image) override;
 
             virtual bool needPushDepthImage() override
             {
@@ -124,30 +134,33 @@ namespace dso
 
             virtual void pushDepthImageFloat(MinimalImageF* image, FrameHessian* KF ) override
             {
-                printf("OUT: Predicted depth for KF %d (id %d, time %f, internal frame-ID %d). CameraToWorld:\n",
-                       KF->frameID,
-                       KF->shell->incoming_id,
-                       KF->shell->timestamp,
-                       KF->shell->id);
-                std::cout << KF->shell->camToWorld.matrix3x4() << "\n";
-
-                int maxWrite = 5;
-                for(int y=0;y<image->h;y++)
-                {
-                    for(int x=0;x<image->w;x++)
-                    {
-                        if(image->at(x,y) <= 0) continue;
-
-                        printf("OUT: Example Idepth at pixel (%d,%d): %f.\n", x,y,image->at(x,y));
-                        maxWrite--;
-                        if(maxWrite==0) break;
-                    }
-                    if(maxWrite==0) break;
-                }
+//                printf("OUT: Predicted depth for KF %d (id %d, time %f, internal frame-ID %d). CameraToWorld:\n",
+//                       KF->frameID,
+//                       KF->shell->incoming_id,
+//                       KF->shell->timestamp,
+//                       KF->shell->id);
+//                std::cout << KF->shell->camToWorld.matrix3x4() << "\n\n";
+//
+//                int maxWrite = 5;
+//                for(int y=0;y<image->h;y++)
+//                {
+//                    for(int x=0;x<image->w;x++)
+//                    {
+//                        if(image->at(x,y) <= 0) continue;
+//
+//                        printf("OUT: Example Idepth at pixel (%d,%d): %f.\n", x,y,image->at(x,y));
+//                        maxWrite--;
+//                        if(maxWrite==0) break;
+//                    }
+//                    if(maxWrite==0) break;
+//                }
+//                std::cout << KF->PRE_camToWorld.matrix3x4() << "\n\n";
+//                std::cout << KF->PRE_worldToCam.matrix3x4() << "\n\n";
             }
 
             void addImgToSeq(cv_bridge::CvImagePtr, int id);
-            void addImgToSeq(cv::Mat img, int id);
+            void addImgToSeq(cv::Mat, int id);
+            void addPointToSeq(cv::Point, int id);
 
         private:
 
@@ -158,8 +171,17 @@ namespace dso
             ros::Publisher dso_odom_pub_;
             tf::TransformBroadcaster odom_broadcaster_;
 
-            std::map<int,cv::Mat> seq_imgs_;
-//            std::vector<cv::Mat> seq_imgs_;
+            std::map<int, cv::Mat> seq_imgs_;
+            std::map<int, Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 4>> seq_poses_;
+            std::map<int, cv::Point> seq_tracking_;
+
+            Eigen::Matrix<double, 4, 1> wpt_;
+            bool init_wpts_;
+
+//            // TODO test
+//            std::vector<double> seq_X_;
+//            std::vector<double> seq_Y_;
+//            std::vector<double> seq_Z_;
         };
     }
 }

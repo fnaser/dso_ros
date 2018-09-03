@@ -41,12 +41,28 @@
 
 #include <dso_ros/ros_output_wrapper.h>
 
+// Tracking
+#include <opencv2/opencv.hpp>
+#include <opencv2/tracking.hpp>
+#include <opencv2/core/ocl.hpp>
+
+using namespace dso;
+
 std::string calib = "";
 std::string vignetteFile = "";
 std::string gammaFile = "";
 bool useSampleOutput = false;
 
-using namespace dso;
+FullSystem* fullSystem = 0;
+Undistort* undistorter = 0;
+int frameID = 0;
+
+// Tracking
+bool trackingStarted = false;
+cv::Ptr<cv::Tracker> tracker;
+std::string trackerType = "MIL";
+cv::Rect2d bbox;
+
 
 void parseArgument(char* arg)
 {
@@ -128,9 +144,33 @@ void parseArgument(char* arg)
 }
 
 
-FullSystem* fullSystem = 0;
-Undistort* undistorter = 0;
-int frameID = 0;
+void initTracker(std::string trackerType)
+{
+#if (CV_MINOR_VERSION < 3)
+    {
+        tracker = cv::Tracker::create(trackerType);
+    }
+#else
+    {
+        if (trackerType == "BOOSTING")
+            tracker = cv::TrackerBoosting::create();
+        if (trackerType == "MIL")
+            tracker = cv::TrackerMIL::create();
+        if (trackerType == "KCF")
+            tracker = cv::TrackerKCF::create();
+        if (trackerType == "TLD")
+            tracker = cv::TrackerTLD::create();
+        if (trackerType == "MEDIANFLOW")
+            tracker = cv::TrackerMedianFlow::create();
+        if (trackerType == "GOTURN")
+            tracker = cv::TrackerGOTURN::create();
+        if (trackerType == "MOSSE")
+            tracker = cv::TrackerMOSSE::create();
+//        if (trackerType == "CSRT")
+//            tracker = cv::TrackerCSRT::create();
+    }
+#endif
+}
 
 
 void vidCb(const sensor_msgs::ImageConstPtr img)
@@ -150,25 +190,45 @@ void vidCb(const sensor_msgs::ImageConstPtr img)
         if(undistorter->photometricUndist != 0) {
             fullSystem->setGammaFunction(undistorter->photometricUndist->getG());
         }
+        // TODO reset iowrapper
         setting_fullResetRequested=false;
     }
 
     // TODO under construction [
-    if (frameID % 10 == 0) {
-        cv::imshow("Image Window Test [main]", cv_ptr->image);
-        cv::waitKey(1);
-    }
-
-//    for(IOWrap::Output3DWrapper* ow : fullSystem->outputWrapper.at(1))
-//    {
-//        dynamic_cast<IOWrap::SampleOutputWrapper*>(ow)->addImgToSeq(cv_ptr->image, frameID);
+//    if (frameID % 10 == 0) {
+//        cv::imshow("Image Window Test [main]", cv_ptr->image);
+//        cv::waitKey(1);
 //    }
-    dynamic_cast<IOWrap::SampleOutputWrapper*>(fullSystem->outputWrapper.at(1))->addImgToSeq(cv_ptr, frameID);
+
+    // TODO idx of iowrapper
+    int idx_SampleOutputWrapper = fullSystem->outputWrapper.size()-1;
+
+    // add img
+    dynamic_cast<IOWrap::SampleOutputWrapper*>
+    (fullSystem->outputWrapper.at(idx_SampleOutputWrapper))
+            ->addImgToSeq(cv_ptr, frameID);
+
+    // Tracking
+    // TODO add tracking point as param
+    if(!trackingStarted) {
+        bool fromCenter = true;
+        bbox = cv::selectROI("Tracking ROI Selection", cv_ptr->image, fromCenter);
+        tracker->init(cv_ptr->image, bbox);
+        trackingStarted = true;
+    } else {
+        bool ok = tracker->update(cv_ptr->image, bbox);
+    }
+    cv::Point center_of_rect = (bbox.br() + bbox.tl())*0.5;
+    dynamic_cast<IOWrap::SampleOutputWrapper*>
+    (fullSystem->outputWrapper.at(idx_SampleOutputWrapper))
+            ->addPointToSeq(center_of_rect, frameID);
+
     // TODO ]
 
     MinimalImageB minImg((int)cv_ptr->image.cols, (int)cv_ptr->image.rows,(unsigned char*)cv_ptr->image.data);
     ImageAndExposure* undistImg = undistorter->undistort<unsigned char>(&minImg, 1,0, 1.0f);
     fullSystem->addActiveFrame(undistImg, frameID);
+
     frameID++;
     delete undistImg;
 }
@@ -176,10 +236,20 @@ void vidCb(const sensor_msgs::ImageConstPtr img)
 
 int main( int argc, char** argv )
 {
+    // ROS init
     ros::init(argc, argv, "dso_live");
     ros::NodeHandle nh;
 
-    for(int i=1; i<argc; i++) parseArgument(argv[i]);
+    // Eigen
+#if EIGEN_VERSION_AT_LEAST(3,3,0)
+    ROS_INFO("Eigen at least 3.3");
+#else
+    ROS_INFO("Eigen %d", EIGEN_WORLD_VERSION);
+#endif
+
+    for(int i=1; i<argc; i++) {
+        parseArgument(argv[i]);
+    }
 
     setting_desiredImmatureDensity = 1000;
     setting_desiredPointDensity = 1200;
@@ -205,25 +275,30 @@ int main( int argc, char** argv )
     fullSystem = new FullSystem();
     fullSystem->linearizeOperation=false;
 
-    if(!disableAllDisplay)
+    if (!disableAllDisplay) {
         fullSystem->outputWrapper.push_back(new IOWrap::PangolinDSOViewer(
-                (int)undistorter->getSize()[0],
-                (int)undistorter->getSize()[1]));
+                (int) undistorter->getSize()[0],
+                (int) undistorter->getSize()[1]));
+    }
 
-    if(useSampleOutput)
+    if (useSampleOutput) {
         fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper(nh));
+    }
 
-    ROS_INFO("number of iowrappers [%zu]", fullSystem->outputWrapper.size());
-
-    if(undistorter->photometricUndist != 0)
+    if (undistorter->photometricUndist != 0) {
         fullSystem->setGammaFunction(undistorter->photometricUndist->getG());
+    }
 
+    // Tracking
+    initTracker("MIL");
+
+    // ROS
+    ROS_INFO("number of iowrappers [%zu]", fullSystem->outputWrapper.size());
     ros::Subscriber imgSub = nh.subscribe("image", 1, &vidCb);
     ros::spin();
 
     // Clean up
-    for(IOWrap::Output3DWrapper* ow : fullSystem->outputWrapper)
-    {
+    for (IOWrap::Output3DWrapper* ow : fullSystem->outputWrapper) {
         ow->join();
         delete ow;
     }

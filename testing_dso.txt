@@ -1,3 +1,5 @@
+# Run DSO locally
+
 ./dso_dataset \
 		files=/home/fnaser/Pictures/dataset/sequence_33/images.zip \
 		calib=/home/fnaser/Pictures/dataset/sequence_33/camera.txt \
@@ -13,3 +15,17 @@
 		vignette=/home/fnaser/Pictures/dataset/sequence_28/vignette.png \
 		preset=0 \
 		mode=0
+
+rosrun dso_ros dso_live image:=/usb_cam/image_raw calib=/home/fnaser/Pictures/dataset/sequence_28/camera_ros_v2.txt gamma=/home/fnaser/Pictures/dataset/sequence_28/pcalib.txt vignette=/home/fnaser/Pictures/dataset/sequence_28/vignette.png sampleoutput=1 quiet=1 nolog=1
+
+# Calibration
+
+rosrun camera_calibration cameracalibrator.py --size 10x7 --square 0.0229 image:=/usb_cam/image_raw camera:=/usb_cam/ #count edges
+
+ROS_NAMESPACE=usb_cam rosrun image_proc image_proc
+
+Edit the PtamFixParams.yaml file and set the parameters "ImageSizeX" "ImageSizeY" to your image resolution.
+
+Edit the cameracalibrator.launch file to map the image to your image topic.
+
+roslaunch ptam cameracalibrator.launch
