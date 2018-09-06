@@ -63,6 +63,8 @@ cv::Ptr<cv::Tracker> tracker;
 std::string trackerType = "MIL";
 cv::Rect2d bbox;
 
+int w, h;
+
 
 void parseArgument(char* arg)
 {
@@ -200,28 +202,31 @@ void vidCb(const sensor_msgs::ImageConstPtr img)
 //        cv::waitKey(1);
 //    }
 
-    // TODO idx of iowrapper
-    int idx_SampleOutputWrapper = fullSystem->outputWrapper.size()-1;
+//    // TODO idx of iowrapper
+//    int idx_SampleOutputWrapper = fullSystem->outputWrapper.size()-1;
+//
+//    // add img
+//    dynamic_cast<IOWrap::SampleOutputWrapper*>
+//    (fullSystem->outputWrapper.at(idx_SampleOutputWrapper))
+//            ->addImgToSeq(cv_ptr, frameID);
+//
+//    // Tracking
+//    // TODO add tracking point as param
+//    if(!trackingStarted) {
+//        ROS_INFO("Start Tracking");
+//        bool fromCenter = true;
+//        bbox = cv::selectROI("Tracking ROI Selection", cv_ptr->image, fromCenter);
+//        tracker->init(cv_ptr->image, bbox);
+//        trackingStarted = true;
+//    } else {
+//        bool ok = tracker->update(cv_ptr->image, bbox);
+//    }
+//    cv::Point center_of_rect = (bbox.br() + bbox.tl())*0.5;
+//    dynamic_cast<IOWrap::SampleOutputWrapper*>
+//    (fullSystem->outputWrapper.at(idx_SampleOutputWrapper))
+//            ->addPointToSeq(center_of_rect, frameID);
 
-    // add img
-    dynamic_cast<IOWrap::SampleOutputWrapper*>
-    (fullSystem->outputWrapper.at(idx_SampleOutputWrapper))
-            ->addImgToSeq(cv_ptr, frameID);
-
-    // Tracking
-    // TODO add tracking point as param
-    if(!trackingStarted) {
-        bool fromCenter = true;
-        bbox = cv::selectROI("Tracking ROI Selection", cv_ptr->image, fromCenter);
-        tracker->init(cv_ptr->image, bbox);
-        trackingStarted = true;
-    } else {
-        bool ok = tracker->update(cv_ptr->image, bbox);
-    }
-    cv::Point center_of_rect = (bbox.br() + bbox.tl())*0.5;
-    dynamic_cast<IOWrap::SampleOutputWrapper*>
-    (fullSystem->outputWrapper.at(idx_SampleOutputWrapper))
-            ->addPointToSeq(center_of_rect, frameID);
+    ROS_INFO("Frame ID %d", frameID);
 
     // TODO ]
 
@@ -267,6 +272,9 @@ int main( int argc, char** argv )
 
     undistorter = Undistort::getUndistorterForFile(calib, gammaFile, vignetteFile);
 
+    w = (int) undistorter->getSize()[0];
+    h = (int) undistorter->getSize()[1];
+
     setGlobalCalib(
             (int)undistorter->getSize()[0],
             (int)undistorter->getSize()[1],
@@ -282,7 +290,7 @@ int main( int argc, char** argv )
     }
 
     if (useSampleOutput) {
-        fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper(nh));
+        fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper(nh, w, h));
     }
 
     if (undistorter->photometricUndist != 0) {
@@ -290,7 +298,7 @@ int main( int argc, char** argv )
     }
 
     // Tracking
-    initTracker("MIL");
+    initTracker(trackerType);
 
     // ROS
     ROS_INFO("number of iowrappers [%zu]", fullSystem->outputWrapper.size());

@@ -71,3 +71,9 @@ target_link_libraries(
         ${catkin_LIBRARIES}
 )
 
+add_executable(ros_pub_imgs src/ros_pub_imgs.cpp)
+target_link_libraries(
+        ros_pub_imgs
+        ${OpenCV_LIBS}
+        ${catkin_LIBRARIES}
+)

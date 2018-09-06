@@ -2,7 +2,8 @@
 #include <dso_ros/ros_output_wrapper.h>
 
 void dso::IOWrap::SampleOutputWrapper::pushDepthImage(MinimalImageB3* image) {
-    // TODO compute plane
+//    dso::IOWrap::displayImage("test", image, true);
+//    cv::waitKey(1);
 }
 
 // TODO under construction
@@ -109,7 +110,7 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
     // distance traveled
     path_length_ += hypot ( pose.position.x - last_pose_.position.x,
                             pose.position.y - last_pose_.position.y);
-    ROS_INFO("Path length [%f]", path_length_);
+//    ROS_INFO("Path length [%f]", path_length_);
 
 //     TODO add pose
 //     TODO causes seg fault
@@ -119,18 +120,17 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
 
     // TODO check if seq full
 
-    //TODO param
-    int start_frame_id = 1;
+    // TODO compute plane
 
     // Tracking
     Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 4, 4> m_tmp;
     m_tmp << m,
             0, 0, 0, 1;
 
-    if ( seq_tracking_.find(start_frame_id) != seq_tracking_.end() &&
+    if ( seq_tracking_.find(start_frame_id_) != seq_tracking_.end() &&
          !init_wpts_) {
 
-        cv::Point p_tmp = seq_tracking_.find(frame->id)->second;
+        cv::Point p_tmp = seq_tracking_.find(start_frame_id_)->second;
         Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 1> ip_tmp; // img point
         ip_tmp << p_tmp.x,
                 p_tmp.y,
@@ -139,8 +139,20 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
         Eigen::Matrix<Sophus::SE3Group<double>::Scalar, Eigen::Dynamic, Eigen::Dynamic> cod_K_tmp = cod_K.pseudoInverse();
 
         wpt_ = m_tmp * cod_K_tmp * ip_tmp; // world point
+        wpt_[3] = 1;
 
-        std::cout << wpt_ << "\n" << std::endl;
+        std::cout << "\n"
+                  << K
+                  << "\n"
+                  << m_tmp
+                  << "\n"
+                  << cod_K_tmp
+                  << "\n"
+                  << ip_tmp
+                  << "\n"
+                  << wpt_
+                  << "\n"
+                  << std::endl;
 
         init_wpts_ = true;
 
@@ -194,28 +206,16 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
 
 // TODO under construction [
 void dso::IOWrap::SampleOutputWrapper::addImgToSeq(cv_bridge::CvImagePtr cv_ptr, int id) {
-//void dso::IOWrap::SampleOutputWrapper::addImgToSeq(cv::Mat img, int id) {
-    if (id % 10 == 0 && id > 10) {
-//        cv::imshow("Image Window Test [iowrapper]", cv_ptr->image);
-//        cv::imshow("Image Window Test [iowrapper]", img);
-//        cv::Mat tmp = seq_imgs_.find(id-5)->second;
-//        cv::Size tmp_size = tmp.size();
-//        ROS_INFO("size [%d x %d]", tmp_size.height, tmp_size.width);
-//        cv::imshow("Image Window Test [iowrapper]", tmp);
-//        cv::waitKey(1);
-    } else {
-        seq_imgs_.insert(std::pair<int, cv::Mat>(id, cv_ptr->image)); //TODO check efficiency
-    }
+    seq_imgs_.insert(std::pair<int, cv::Mat>(id, cv_ptr->image)); //TODO check efficiency
+    // TODO reset requested
+}
 
+void dso::IOWrap::SampleOutputWrapper::addImgToSeq(cv::Mat img, int id) {
+    seq_imgs_.insert(std::pair<int, cv::Mat>(id, img)); //TODO check efficiency
     // TODO reset requested
 }
 
 void dso::IOWrap::SampleOutputWrapper::addPointToSeq(cv::Point p, int id) {
-//    if ( seq_tracking_.find(id) == seq_tracking_.end() ) {
-//
-//    } else {
-//        ROS_INFO("Found corresponding p");
-//    }
     seq_tracking_.insert(
             std::pair<int, cv::Point>(id, p)
     );
