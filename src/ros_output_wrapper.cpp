@@ -122,82 +122,78 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
 
     // TODO compute plane
 
-    // Tracking
     Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 4, 4> m_tmp;
     m_tmp << m,
             0, 0, 0, 1;
 
-    if ( seq_tracking_.find(start_frame_id_) != seq_tracking_.end() &&
-         !init_wpts_) {
+    if ( seq_points_.find(start_frame_id_) != seq_points_.end() &&
+         !wpts_init_ ) {
 
-        cv::Point p_tmp = seq_tracking_.find(start_frame_id_)->second;
-        Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 1> ip_tmp; // img point
-        ip_tmp << p_tmp.x,
-                p_tmp.y,
-                1;
+        ROS_INFO("Adding world points ...");
+
         Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> cod_K(K);
         Eigen::Matrix<Sophus::SE3Group<double>::Scalar, Eigen::Dynamic, Eigen::Dynamic> cod_K_tmp = cod_K.pseudoInverse();
 
-        wpt_ = m_tmp * cod_K_tmp * ip_tmp; // world point
-        wpt_[3] = 1;
+        std::vector<cv::Point> v_tmp = seq_points_.find(start_frame_id_)->second;
 
-        std::cout << "\n"
-                  << K
-                  << "\n"
-                  << m_tmp
-                  << "\n"
-                  << cod_K_tmp
-                  << "\n"
-                  << ip_tmp
-                  << "\n"
-                  << wpt_
-                  << "\n"
-                  << std::endl;
+        for(std::vector<cv::Point>::iterator it = v_tmp.begin(); it != v_tmp.end(); ++it) {
 
-        init_wpts_ = true;
+            Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 1> ip_tmp; // img point
+            ip_tmp << it->x,
+                    it->y,
+                    1;
 
-        //TODO more pts
+            Eigen::Matrix<double, 4, 1, Eigen::DontAlign> w_tmp = m_tmp * cod_K_tmp * ip_tmp; // world point
+            w_tmp[3] = 1;
 
-//        // TODO test
-//        seq_X_.push_back(wp_tmp[0]);
-//        seq_Y_.push_back(wp_tmp[1]);
-//        seq_Z_.push_back(wp_tmp[2]);
-//
-//        double averageX = accumulate( seq_X_.begin(), seq_X_.end(), 0.0)/seq_X_.size();
-//        double averageY = accumulate( seq_Y_.begin(), seq_Y_.end(), 0.0)/seq_Y_.size();
-//        double averageZ = accumulate( seq_Z_.begin(), seq_Z_.end(), 0.0)/seq_Z_.size();
-//
-//        double var = 0;
-//        for (int i = 0; i < seq_X_.size(); i++) {
-//            var += (seq_X_[i] - averageX) * (seq_X_[i] - averageX);
-//        }
-//        var /= seq_X_.size();
-//        double sd = sqrt(var);
-//        std::cout << sd << "\n" << std::endl;
+            std::cout << "\n"
+                      << K
+                      << "\n"
+                      << m_tmp
+                      << "\n"
+                      << cod_K_tmp
+                      << "\n"
+                      << ip_tmp
+                      << "\n"
+                      << w_tmp
+                      << "\n"
+                      << std::endl;
 
-    } else if (init_wpts_) {
-        Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 1> ip_tmp = K * m_tmp.inverse() * wpt_; // img point
+            wpts_mutex_.lock();
+            wpts_.push_back(w_tmp);
+            wpts_mutex_.unlock();
+        }
 
-        cv::Point p;
-        p.x = ip_tmp(0) / ip_tmp(2);
-        p.y = ip_tmp(1) / ip_tmp(2);
+        wpts_init_=true;
 
-//        std::cout << p << std::endl;
+    } else if (wpts_init_ &&
+               seq_imgs_.find(frame->id) != seq_imgs_.end()) {
 
-        int thickness = 10;
-        int lineType = 8;
+//        assert(seq_points_.size() == wpts_.size());
 
-        if (seq_imgs_.find(frame->id) != seq_imgs_.end()) {
-            cv::Mat img_tmp = seq_imgs_.find(frame->id)->second;
+        cv::Mat img_tmp = seq_imgs_.find(frame->id)->second;
+
+        for(int i=0; i < wpts_.size(); i++) {
+
+            Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 1> ip_tmp = K * m_tmp.inverse() * wpts_[i]; // img point
+
+            cv::Point p;
+            p.x = ip_tmp(0) / ip_tmp(2);
+            p.y = ip_tmp(1) / ip_tmp(2);
+
+            int thickness = 10;
+            int lineType = 8;
+
             cv::circle(img_tmp,
                        p,
                        5,
                        cv::Scalar(0, 0, 255),
                        thickness,
                        lineType);
-            cv::imshow("Image Window Test [tracking]", img_tmp);
-            cv::waitKey(1);
         }
+
+        cv::imshow("Image Window Test [tracking]", img_tmp);
+        cv::waitKey(1);
     }
 
     // update pose
@@ -205,6 +201,7 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
 }
 
 // TODO under construction [
+
 void dso::IOWrap::SampleOutputWrapper::addImgToSeq(cv_bridge::CvImagePtr cv_ptr, int id) {
     seq_imgs_.insert(std::pair<int, cv::Mat>(id, cv_ptr->image)); //TODO check efficiency
     // TODO reset requested
@@ -215,10 +212,15 @@ void dso::IOWrap::SampleOutputWrapper::addImgToSeq(cv::Mat img, int id) {
     // TODO reset requested
 }
 
-void dso::IOWrap::SampleOutputWrapper::addPointToSeq(cv::Point p, int id) {
-    seq_tracking_.insert(
-            std::pair<int, cv::Point>(id, p)
-    );
+void dso::IOWrap::SampleOutputWrapper::addVecToSeq(std::vector<cv::Point> vec, int id) {
+    seq_points_.insert(std::pair<int, std::vector<cv::Point>>(id, vec)); //TODO check efficiency
+    // TODO reset requested
 }
+
+//void dso::IOWrap::SampleOutputWrapper::addPointToSeq(cv::Point p, int id) {
+//    seq_tracking_.insert(
+//            std::pair<int, cv::Point>(id, p)
+//    );
+//}
 
 // TODO ]

@@ -47,7 +47,7 @@
 
 #include <float.h>
 #include <math.h>
-
+#include <cassert>
 #include <Eigen/QR>
 #include <Eigen/Dense>
 //#include <boost/accumulators/accumulators.hpp>
@@ -74,12 +74,20 @@ namespace dso
 
                 dso_odom_pub_ = n.advertise<nav_msgs::Odometry>("odom", 5, false); //TODO param
 
-                init_wpts_ = false;
+//                init_wpts_ = false;
                 this->w_ = w;
                 this->h_ = h;
-                trackingStarted_ = false;
-                tracker_ = cv::TrackerMIL::create(); //TODO param
+//                trackingStarted_ = false;
+//                tracker_ = cv::TrackerMIL::create(); //TODO param
                 start_frame_id_ = 15;//250;//20;
+
+                std::vector<cv::Point> center_points;
+                center_points.push_back(cv::Point(100,100));
+                center_points.push_back(cv::Point(50,100));
+                center_points.push_back(cv::Point(150,100));
+                this->addVecToSeq(center_points, start_frame_id_);
+
+                wpts_init_ = false;
             }
 
             virtual ~SampleOutputWrapper()
@@ -145,18 +153,18 @@ namespace dso
 
                 cv::Mat tmp = cv::Mat(h_, w_, CV_8UC3, internalVideoImg->data);
 
-                if(!trackingStarted_ && frameID == start_frame_id_) {
-                    ROS_INFO("Start Tracking ...");
-                    bool fromCenter = true;
-                    bbox_ = cv::selectROI("Tracking ROI Selection", tmp, fromCenter);
-                    tracker_->init(tmp, bbox_);
-                    trackingStarted_ = true;
-                } else {
-                    bool ok = tracker_->update(tmp, bbox_);
-                }
-
-                cv::Point center_of_rect = (bbox_.br() + bbox_.tl()) *0.5;
-                this->addPointToSeq(center_of_rect, frameID);
+//                if(!trackingStarted_ && frameID == start_frame_id_) {
+//                    ROS_INFO("Start Tracking ...");
+//                    bool fromCenter = true;
+//                    bbox_ = cv::selectROI("Tracking ROI Selection", tmp, fromCenter);
+//                    tracker_->init(tmp, bbox_);
+//                    trackingStarted_ = true;
+//                } else {
+//                    bool ok = tracker_->update(tmp, bbox_);
+//                }
+//
+//                cv::Point center_of_rect = (bbox_.br() + bbox_.tl()) *0.5;
+//                this->addPointToSeq(center_of_rect, frameID);
 
 //                std::cout << bbox_ << std::endl;
 //                std::cout << center_of_rect << std::endl;
@@ -199,7 +207,8 @@ namespace dso
 
             void addImgToSeq(cv_bridge::CvImagePtr, int id);
             void addImgToSeq(cv::Mat, int id);
-            void addPointToSeq(cv::Point, int id);
+//            void addPointToSeq(cv::Point, int id);
+            void addVecToSeq(std::vector<cv::Point>, int id);
 
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -214,21 +223,14 @@ namespace dso
             tf::TransformBroadcaster odom_broadcaster_;
 
             std::map<int, cv::Mat> seq_imgs_;
-            std::map<int, Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 4>> seq_poses_;
-            std::map<int, cv::Point> seq_tracking_;
+//            std::map<int, Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 4>> seq_poses_;
+            std::map<int, std::vector<cv::Point>> seq_points_;
 
-            Eigen::Matrix<double, 4, 1> wpt_;
-            bool init_wpts_, trackingStarted_;
-
+            std::vector<Eigen::Matrix<double, 4, 1, Eigen::DontAlign>> wpts_;
+            boost::mutex wpts_mutex_;
+            bool wpts_init_;
             int w_, h_;
-            cv::Rect2d bbox_;
-            cv::Ptr<cv::Tracker> tracker_;
             int start_frame_id_;
-
-//            // TODO test
-//            std::vector<double> seq_X_;
-//            std::vector<double> seq_Y_;
-//            std::vector<double> seq_Z_;
         };
     }
 }
