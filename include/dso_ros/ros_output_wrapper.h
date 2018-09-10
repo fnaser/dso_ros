@@ -44,6 +44,7 @@
 #include <opencv2/tracking.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
 #include <opencv2/highgui/highgui.hpp>
+#include <opencv2/calib3d/calib3d.hpp>
 
 #include <float.h>
 #include <math.h>
@@ -72,20 +73,22 @@ namespace dso
             {
                 printf("OUT: Created SampleOutputWrapper\n");
 
-                dso_odom_pub_ = n.advertise<nav_msgs::Odometry>("odom", 5, false); //TODO param
+//                dso_odom_pub_ = n.advertise<nav_msgs::Odometry>("odom", 5, false); //TODO param
 
-//                init_wpts_ = false;
                 this->w_ = w;
                 this->h_ = h;
-//                trackingStarted_ = false;
-//                tracker_ = cv::TrackerMIL::create(); //TODO param
-                start_frame_id_ = 15;//250;//20;
+                start_frame_id_ = 15; //TODO param
+                seq_cnt_ = 0;
+                seq_length_ = 10; //TODO param
 
                 std::vector<cv::Point> center_points;
-                center_points.push_back(cv::Point(100,100));
-                center_points.push_back(cv::Point(50,100));
-                center_points.push_back(cv::Point(150,100));
-                this->addVecToSeq(center_points, start_frame_id_);
+                center_points.push_back(cv::Point(150,150)); //TODO param
+                center_points.push_back(cv::Point(50,150));
+                center_points.push_back(cv::Point(150,50));
+                center_points.push_back(cv::Point(50,50));
+                seq_start_points_.insert(
+                        std::pair<int, std::vector<cv::Point>>(start_frame_id_, center_points)
+                ); //TODO change data type
 
                 wpts_init_ = false;
             }
@@ -138,8 +141,7 @@ namespace dso
             virtual void publishCamPose(FrameShell* frame, CalibHessian* HCalib) override;
 
             virtual void pushLiveFrame(FrameHessian* image) override {
-//                int w = 640; //1280;//1280;
-//                int h = 480; //720; //1024;
+
                 MinimalImageB3* internalVideoImg = new MinimalImageB3(w_,h_);
                 internalVideoImg->setBlack();
 
@@ -208,7 +210,7 @@ namespace dso
             void addImgToSeq(cv_bridge::CvImagePtr, int id);
             void addImgToSeq(cv::Mat, int id);
 //            void addPointToSeq(cv::Point, int id);
-            void addVecToSeq(std::vector<cv::Point>, int id);
+//            void addVecToSeq(std::vector<cv::Point>, int id);
 
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -216,7 +218,6 @@ namespace dso
         private:
 
             geometry_msgs::Pose last_pose_;
-
             double path_length_;
 
             ros::Publisher dso_odom_pub_;
@@ -224,11 +225,15 @@ namespace dso
 
             std::map<int, cv::Mat> seq_imgs_;
 //            std::map<int, Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 4>> seq_poses_;
-            std::map<int, std::vector<cv::Point>> seq_points_;
+            std::map<int, std::vector<cv::Point>> seq_start_points_;
+            std::map<int, std::vector<cv::Point>> seq_img_points_;
 
             std::vector<Eigen::Matrix<double, 4, 1, Eigen::DontAlign>> wpts_;
             boost::mutex wpts_mutex_;
             bool wpts_init_;
+
+            int seq_cnt_;
+            int seq_length_;
             int w_, h_;
             int start_frame_id_;
         };
