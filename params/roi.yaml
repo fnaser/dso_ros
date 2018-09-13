@@ -1,0 +1,6 @@
+#todo seq specific params
+p1: [150, 150]
+p2: [ 50, 150]
+p3: [150,  50]
+p4: [ 50,  50]
+start_frame_id: 15

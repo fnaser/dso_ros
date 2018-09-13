@@ -35,7 +35,7 @@ int main ( int argc, char** argv )
 
         ros::Publisher lo_pub = lo_nh.advertise<sensor_msgs::Image>("/usb_cam/image_raw", 5 );
 
-        int lo_rate = 20;
+        int lo_rate = 10;//20;
 
         ROS_INFO_STREAM( "Publishing images at " << lo_rate << "hz" );
         ros::Rate lo_rate1( lo_rate );

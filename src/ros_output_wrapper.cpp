@@ -1,23 +1,6 @@
 
 #include <dso_ros/ros_output_wrapper.h>
 
-void dso::IOWrap::SampleOutputWrapper::pushDepthImage(MinimalImageB3* image) {
-//    dso::IOWrap::displayImage("test", image, true);
-//    cv::waitKey(1);
-}
-
-// TODO under construction
-//void dso::IOWrap::SampleOutputWrapper::pushDepthImageFloat(dso::MinimalImageF* image,
-//                                                           dso::FrameHessian* KF) {
-//    cv::Mat image_cv(image->h, image->w, CV_32FC1, image->data);
-//    image_cv.convertTo(image_cv, CV_8UC1, 255.0f);
-//    cv::Mat inverted_img;
-//    cv::bitwise_not(image_cv, inverted_img);
-//
-//    cv::imshow("Image Window Test [depthimg]", image_cv);
-//    cv::waitKey(1);
-//}
-
 /*
  * frame->camToWorld.matrix3x4() returns:
  *
@@ -32,14 +15,6 @@ void dso::IOWrap::SampleOutputWrapper::pushDepthImage(MinimalImageB3* image) {
 
 void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
                                                       dso::CalibHessian* HCalib) {
-    // TODO under construction
-//    ROS_DEBUG_STREAM("publishCamPose called");
-//
-//    printf("OUT: Current Frame %d (time %f, internal ID %d). CameraToWorld:\n",
-//           frame->incoming_id,
-//           frame->timestamp,
-//           frame->id);
-//    std::cout << frame->camToWorld.matrix3x4() << "\n";
 
     // Init K
     Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 4> K =
@@ -59,74 +34,9 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
     m_tmp << m,
             0, 0, 0, 1;
 
-//    // camera position
-//    double camX = m(0, 3);
-//    double camY = m(1, 3);
-//    double camZ = m(2, 3);
-//
-//    // camera orientation
-//    Eigen::Quaterniond qe(m.block<3,3>(0,0));
-//
-//    // get tf
-//    tf::Transform transform;
-//    transform.setOrigin(tf::Vector3(camX, camY, camZ));
-//    tf::Quaternion q = tf::Quaternion(qe.x(), qe.y(), qe.z(), qe.w());
-//    transform.setRotation(q);
-//
-//    // publish tf
-//    odom_broadcaster_.sendTransform(tf::StampedTransform(transform, ros::Time::now(),
-//                                                         "odom", "base_link")); //TODO param
-//
-//    // odom msg
-//    nav_msgs::Odometry odom;
-//    odom.header.stamp = ros::Time::now();
-//    odom.header.frame_id = "odom"; //TODO param
-//    odom.child_frame_id = "base_link"; //TODO param
-//
-//    geometry_msgs::Pose pose;
-//    pose.position.x = camX;
-//    pose.position.y = camY;
-//    pose.position.z = camZ;
-//    pose.orientation.x = qe.x();
-//    pose.orientation.y = qe.y();
-//    pose.orientation.z = qe.z();
-//    pose.orientation.w = qe.w();
-//
-//    odom.pose.pose = pose;
-//
-//    odom.twist.twist.linear.x = pose.position.x - last_pose_.position.x;
-//    odom.twist.twist.linear.y = pose.position.y - last_pose_.position.y;
-//    odom.twist.twist.linear.z = pose.position.z - last_pose_.position.z;
-////    odom.twist.twist.linear.x = pose.position.x;
-////    odom.twist.twist.linear.y = pose.position.y;
-////    odom.twist.twist.linear.z = pose.position.z;
-//
-//    // publish odom
-//    if(!std::isnan(camX)      && !std::isnan(camY)   && !std::isnan(camZ)
-//       && !std::isnan(qe.x()) && !std::isnan(qe.y()) && !std::isnan(qe.z()) &&!std::isnan(qe.w())
-//       && !std::isinf(camX)   && !std::isinf(camY)   && !std::isinf(camZ)
-//       && !std::isinf(qe.x()) && !std::isinf(qe.y()) && !std::isinf(qe.z()) &&!std::isinf(qe.w()))
-//    {
-//        dso_odom_pub_.publish(odom);
-//    } else {
-//        ROS_WARN("Odom msg corrupted");
-//    }
-//
-//    // distance traveled
-//    path_length_ += hypot ( pose.position.x - last_pose_.position.x,
-//                            pose.position.y - last_pose_.position.y);
-////    ROS_INFO("Path length [%f]", path_length_);
-//
-//     TODO add pose
-//     TODO causes seg fault
-//    seq_poses_.insert(
-//            std::pair<int, Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 4>>
-//                                                                               (frame->id, m));
-//
-//    // update pose
-//    last_pose_ = pose;
-
     // TODO compute plane
+    // TODO check points and img association
+    // TODO check homography
 
     if ( frame->id == start_frame_id_ &&
          seq_start_points_.find(start_frame_id_) != seq_start_points_.end() &&
@@ -138,7 +48,16 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
         Eigen::CompleteOrthogonalDecomposition<Eigen::MatrixXd> cod_K(K);
         Eigen::Matrix<Sophus::SE3Group<double>::Scalar, Eigen::Dynamic, Eigen::Dynamic> cod_K_tmp = cod_K.pseudoInverse();
 
-        std::vector<cv::Point> v_tmp = seq_start_points_.find(start_frame_id_)->second;
+        std::vector <cv::Point> v_tmp;
+        if (use_yaml_start_points_) {
+            v_tmp = seq_start_points_.find(start_frame_id_)->second;
+        } else {
+            v_tmp.push_back(getPoint(frame->id));
+            v_tmp.push_back(getPoint(frame->id));
+            v_tmp.push_back(getPoint(frame->id));
+            v_tmp.push_back(getPoint(frame->id));
+        }
+        std::cout << "v_tmp: " << v_tmp << std::endl;
 
         for(std::vector<cv::Point>::iterator it = v_tmp.begin(); it != v_tmp.end(); ++it) {
 
@@ -206,12 +125,11 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
 
         seq_cnt_++;
 
-        cv::imshow("Image Window Test [tracking]", img_tmp);
+        cv::imshow("Image Window Test [tracking]", img_tmp*2);
         cv::waitKey(1);
     }
 
-    if (seq_cnt_ % seq_length_ == 0 && seq_cnt_ >= seq_length_) { // TODO param
-//        ROS_INFO("seq full");
+    if (seq_cnt_ % seq_length_ == 0 && seq_cnt_ >= seq_length_) {
 
         for (int i=seq_length_-1; i>=0; i--) {
 
@@ -220,7 +138,6 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
 
             if ( seq_img_points_.find(idx) != seq_img_points_.end() &&
                  seq_imgs_.find(idx) != seq_imgs_.end() ) {
-//                ROS_INFO("seq idx %d", frame->id-i);
 
                 if (i <= seq_length_-2) {
 
@@ -231,13 +148,16 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
 
                     cv::Mat h = cv::findHomography(
                             seq_img_points_.find(idx)->second,
-                            seq_img_points_.find(start_idx)->second,
+//                            seq_img_points_.find(start_idx)->second,
+                            seq_scene_points_,
                             CV_RANSAC
                     );
 
                     cv::Mat img_tmp;
-                    cv::warpPerspective(seq_imgs_.find(idx)->second, img_tmp, h, seq_imgs_.find(start_idx)->second.size());
+//                    cv::warpPerspective(seq_imgs_.find(idx)->second, img_tmp, h, seq_imgs_.find(start_idx)->second.size());
+                    cv::warpPerspective(seq_imgs_.find(idx)->second, img_tmp, h, cv::Size(150,150));
 
+                    //TODO cropping
 //                    try {
 //                        img_tmp = img_tmp(cv::Rect(seq_img_points_.find(start_idx)->second[3].x, //TODO param
 //                                                   seq_img_points_.find(start_idx)->second[3].y,
@@ -249,15 +169,15 @@ void dso::IOWrap::SampleOutputWrapper::publishCamPose(dso::FrameShell* frame,
 //                    }
 
                     cv::imshow("Image Window Test [homography]", img_tmp);
-                    cv::waitKey(300);
+                    cv::waitKey(1);
                 }
-
 
             } else {
                 ROS_WARN("Image Point or Image is missing in Sequence");
             }
         }
     }
+
 }
 
 // TODO under construction [
@@ -272,10 +192,11 @@ void dso::IOWrap::SampleOutputWrapper::addImgToSeq(cv::Mat img, int id) {
     // TODO reset requested
 }
 
-//void dso::IOWrap::SampleOutputWrapper::addPointToSeq(cv::Point p, int id) {
-//    seq_tracking_.insert(
-//            std::pair<int, cv::Point>(id, p)
-//    );
-//}
-
 // TODO ]
+
+cv::Point dso::IOWrap::SampleOutputWrapper::getPoint(int id) {
+    bool fromCenter = true;
+    cv::Rect bbox = cv::selectROI("Tracking ROI Selection", seq_imgs_.find(id)->second*2, fromCenter);
+    cv::Point center_of_rect = (bbox.br() + bbox.tl()) *0.5;
+    return center_of_rect;
+};

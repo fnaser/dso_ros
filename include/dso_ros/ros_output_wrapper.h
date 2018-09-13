@@ -23,6 +23,7 @@
 
 
 #pragma once
+
 #include "boost/thread.hpp"
 #include "util/MinimalImage.h"
 #include "IOWrapper/Output3DWrapper.h"
@@ -51,8 +52,6 @@
 #include <cassert>
 #include <Eigen/QR>
 #include <Eigen/Dense>
-//#include <boost/accumulators/accumulators.hpp>
-//#include <boost/accumulators/statistics.hpp>
 
 namespace dso
 {
@@ -69,7 +68,7 @@ namespace dso
 
         public:
 
-            inline SampleOutputWrapper(ros::NodeHandle& n, int w, int h)
+            inline SampleOutputWrapper(ros::NodeHandle& n, int w, int h, bool use_yaml_start_points)
             {
                 printf("OUT: Created SampleOutputWrapper\n");
 
@@ -77,18 +76,37 @@ namespace dso
 
                 this->w_ = w;
                 this->h_ = h;
-                start_frame_id_ = 15; //TODO param
+                start_frame_id_ = 100; //TODO param
                 seq_cnt_ = 0;
                 seq_length_ = 10; //TODO param
+                this->use_yaml_start_points_ = use_yaml_start_points;
 
                 std::vector<cv::Point> center_points;
-                center_points.push_back(cv::Point(150,150)); //TODO param
-                center_points.push_back(cv::Point(50,150));
-                center_points.push_back(cv::Point(150,50));
-                center_points.push_back(cv::Point(50,50));
+//                center_points.push_back(cv::Point(150, 150)); //TODO param
+//                center_points.push_back(cv::Point( 50, 150));
+//                center_points.push_back(cv::Point(150, 50));
+//                center_points.push_back(cv::Point( 50, 50));
+//                center_points.push_back(cv::Point(174, 244)); //TODO param 15
+//                center_points.push_back(cv::Point(128, 204));
+//                center_points.push_back(cv::Point(76, 224));
+//                center_points.push_back(cv::Point(115, 278));
+//                center_points.push_back(cv::Point(365, 350)); //TODO param 100
+//                center_points.push_back(cv::Point(290, 328));
+//                center_points.push_back(cv::Point(278, 394));
+//                center_points.push_back(cv::Point(358, 417));
+                center_points.push_back(cv::Point(404, 194)); //TODO param 100
+                center_points.push_back(cv::Point(311, 165));
+                center_points.push_back(cv::Point(297, 232));
+                center_points.push_back(cv::Point(372, 265));
                 seq_start_points_.insert(
                         std::pair<int, std::vector<cv::Point>>(start_frame_id_, center_points)
                 ); //TODO change data type
+
+                seq_scene_points_.push_back(cv::Point(150,   0)); //TODO param
+                seq_scene_points_.push_back(cv::Point(  0,   0));
+                seq_scene_points_.push_back(cv::Point(  0, 150));
+                seq_scene_points_.push_back(cv::Point(150, 150));
+//                seq_scene_size_ = cv::
 
                 wpts_init_ = false;
             }
@@ -98,45 +116,9 @@ namespace dso
                 printf("OUT: Destroyed SampleOutputWrapper\n");
             }
 
-            virtual void publishGraph(const std::map<uint64_t, Eigen::Vector2i, std::less<uint64_t>, Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>> &connectivity) override
-            {
-//                printf("OUT: got graph with %d edges\n", (int)connectivity.size());
-//
-//                int maxWrite = 5;
-//
-//                for(const std::pair<uint64_t,Eigen::Vector2i> &p : connectivity)
-//                {
-//                    int idHost = p.first>>32;
-//                    int idTarget = p.first & ((uint64_t)0xFFFFFFFF);
-//                    printf("OUT: Example Edge %d -> %d has %d active and %d marg residuals\n", idHost, idTarget, p.second[0], p.second[1]);
-//                    maxWrite--;
-//                    if(maxWrite==0) break;
-//                }
-            }
+            virtual void publishGraph(const std::map<uint64_t, Eigen::Vector2i, std::less<uint64_t>, Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>> &connectivity) override {}
 
-            virtual void publishKeyframes( std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib) override
-            {
-//                for(FrameHessian* f : frames)
-//                {
-//                    printf("OUT: KF %d (%s) (id %d, tme %f): %d active, %d marginalized, %d immature points. CameraToWorld:\n",
-//                           f->frameID,
-//                           final ? "final" : "non-final",
-//                           f->shell->incoming_id,
-//                           f->shell->timestamp,
-//                           (int)f->pointHessians.size(), (int)f->pointHessiansMarginalized.size(), (int)f->immaturePoints.size());
-//                    std::cout << f->shell->camToWorld.matrix3x4() << "\n";
-//
-//
-//                    int maxWrite = 5;
-//                    for(PointHessian* p : f->pointHessians)
-//                    {
-//                        printf("OUT: Example Point x=%.1f, y=%.1f, idepth=%f, idepth std.dev. %f, %d inlier-residuals\n",
-//                               p->u, p->v, p->idepth_scaled, sqrt(1.0f / p->idepth_hessian), p->numGoodResiduals );
-//                        maxWrite--;
-//                        if(maxWrite==0) break;
-//                    }
-//                }
-            }
+            virtual void publishKeyframes( std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib) override {}
 
             virtual void publishCamPose(FrameShell* frame, CalibHessian* HCalib) override;
 
@@ -155,65 +137,24 @@ namespace dso
 
                 cv::Mat tmp = cv::Mat(h_, w_, CV_8UC3, internalVideoImg->data);
 
-//                if(!trackingStarted_ && frameID == start_frame_id_) {
-//                    ROS_INFO("Start Tracking ...");
-//                    bool fromCenter = true;
-//                    bbox_ = cv::selectROI("Tracking ROI Selection", tmp, fromCenter);
-//                    tracker_->init(tmp, bbox_);
-//                    trackingStarted_ = true;
-//                } else {
-//                    bool ok = tracker_->update(tmp, bbox_);
-//                }
-//
-//                cv::Point center_of_rect = (bbox_.br() + bbox_.tl()) *0.5;
-//                this->addPointToSeq(center_of_rect, frameID);
-
-//                std::cout << bbox_ << std::endl;
-//                std::cout << center_of_rect << std::endl;
-
                 this->addImgToSeq(tmp, frameID);
             }
 
-            virtual void pushDepthImage(MinimalImageB3* image) override;
+            virtual void pushDepthImage(MinimalImageB3* image) override {}
 
             virtual bool needPushDepthImage() override
             {
                 return false;
             }
 
-            virtual void pushDepthImageFloat(MinimalImageF* image, FrameHessian* KF ) override
-            {
-//                printf("OUT: Predicted depth for KF %d (id %d, time %f, internal frame-ID %d). CameraToWorld:\n",
-//                       KF->frameID,
-//                       KF->shell->incoming_id,
-//                       KF->shell->timestamp,
-//                       KF->shell->id);
-//                std::cout << KF->shell->camToWorld.matrix3x4() << "\n\n";
-//
-//                int maxWrite = 5;
-//                for(int y=0;y<image->h;y++)
-//                {
-//                    for(int x=0;x<image->w;x++)
-//                    {
-//                        if(image->at(x,y) <= 0) continue;
-//
-//                        printf("OUT: Example Idepth at pixel (%d,%d): %f.\n", x,y,image->at(x,y));
-//                        maxWrite--;
-//                        if(maxWrite==0) break;
-//                    }
-//                    if(maxWrite==0) break;
-//                }
-//                std::cout << KF->PRE_camToWorld.matrix3x4() << "\n\n";
-//                std::cout << KF->PRE_worldToCam.matrix3x4() << "\n\n";
-            }
+            virtual void pushDepthImageFloat(MinimalImageF* image, FrameHessian* KF ) override {}
 
             void addImgToSeq(cv_bridge::CvImagePtr, int id);
             void addImgToSeq(cv::Mat, int id);
-//            void addPointToSeq(cv::Point, int id);
-//            void addVecToSeq(std::vector<cv::Point>, int id);
+            cv::Point getPoint(int id);
 
         public:
-            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
         private:
 
@@ -224,9 +165,9 @@ namespace dso
             tf::TransformBroadcaster odom_broadcaster_;
 
             std::map<int, cv::Mat> seq_imgs_;
-//            std::map<int, Eigen::Matrix<Sophus::SE3Group<double>::Scalar, 3, 4>> seq_poses_;
             std::map<int, std::vector<cv::Point>> seq_start_points_;
             std::map<int, std::vector<cv::Point>> seq_img_points_;
+            std::vector<cv::Point> seq_scene_points_;
 
             std::vector<Eigen::Matrix<double, 4, 1, Eigen::DontAlign>> wpts_;
             boost::mutex wpts_mutex_;
@@ -236,6 +177,8 @@ namespace dso
             int seq_length_;
             int w_, h_;
             int start_frame_id_;
+            bool use_yaml_start_points_;
+
         };
     }
 }
